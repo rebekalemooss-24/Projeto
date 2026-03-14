@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cadastro de Produtos</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 30px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+    }
+
+    h1, h2 {
+      text-align: center;
+      margin-top: 0;
+    }
+
+    form {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    input, textarea, button, select {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    button {
+      background: #1f6feb;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #1557b0;
+    }
+
+    .produto {
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 12px;
+      background: #fafafa;
+    }
+
+    .produto h3 {
+      margin: 0 0 8px;
+    }
+
+    .produto p {
+      margin: 6px 0;
+      color: #555;
+    }
+
+    .btn-excluir {
+      background: #d93025;
+      max-width: 120px;
+      margin-top: 10px;
+    }
+
+    .btn-excluir:hover {
+      background: #b42318;
+    }
+
+    .mensagem {
+      margin-bottom: 16px;
+      padding: 10px;
+      border-radius: 8px;
+      display: none;
+    }
+
+    .sucesso {
+      background: #e8f7ed;
+      color: #1f7a3d;
+    }
+
+    .erro {
+      background: #fdeaea;
+      color: #a12626;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 700px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .info {
+      font-size: 14px;
+      color: #444;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Cadastro de Produtos</h1>
+
+    <div id="mensagem" class="mensagem"></div>
+
+    <form id="formProduto">
+      <input type="text" id="nome" placeholder="Nome do produto" required />
+
+      <textarea id="descricao" placeholder="Descrição do produto" required></textarea>
+
+      <div class="grid-2">
+        <input type="number" id="preco" placeholder="Preço" min="0" step="0.01" required />
+        <input type="number" id="quantidade" placeholder="Quantidade" min="0" step="1" required />
+      </div>
+
+      <input type="text" id="categoria" placeholder="Categoria" required />
+
+      <button type="submit">Cadastrar</button>
+    </form>
+
+    <h2>Produtos cadastrados</h2>
+    <div id="listaProdutos"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById("formProduto");
+    const nomeInput = document.getElementById("nome");
+    const descricaoInput = document.getElementById("descricao");
+    const precoInput = document.getElementById("preco");
+    const quantidadeInput = document.getElementById("quantidade");
+    const categoriaInput = document.getElementById("categoria");
+    const listaProdutos = document.getElementById("listaProdutos");
+    const mensagem = document.getElementById("mensagem");
+
+    function mostrarMensagem(texto, tipo) {
+      mensagem.textContent = texto;
+      mensagem.className = `mensagem ${tipo}`;
+      mensagem.style.display = "block";
+
+      setTimeout(() => {
+        mensagem.style.display = "none";
+      }, 3000);
+    }
+
+    function formatarPreco(valor) {
+      return Number(valor).toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL"
+      });
+    }
+
+    async function carregarProdutos() {
+      try {
+        const resposta = await fetch("/api/produtos");
+        const produtos = await resposta.json();
+
+        listaProdutos.innerHTML = "";
+
+        if (produtos.length === 0) {
+          listaProdutos.innerHTML = "<p>Nenhum produto cadastrado.</p>";
+          return;
+        }
+
+        produtos.forEach((produto) => {
+          const div = document.createElement("div");
+          div.className = "produto";
+
+          div.innerHTML = `
+            <h3>${produto.nome}</h3>
+            <p><strong>Descrição:</strong> ${produto.descricao}</p>
+            <p><strong>Categoria:</strong> ${produto.categoria}</p>
+            <p><strong>Preço:</strong> ${formatarPreco(produto.preco)}</p>
+            <p><strong>Quantidade:</strong> ${produto.quantidade}</p>
+            <button class="btn-excluir" onclick="excluirProduto('${produto._id}')">Excluir</button>
+          `;
+
+          listaProdutos.appendChild(div);
+        });
+      } catch (error) {
+        mostrarMensagem("Erro ao carregar produtos", "erro");
+      }
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const nome = nomeInput.value.trim();
+      const descricao = descricaoInput.value.trim();
+      const preco = precoInput.value;
+      const quantidade = quantidadeInput.value;
+      const categoria = categoriaInput.value.trim();
+
+      if (!nome || !descricao || preco === "" || quantidade === "" || !categoria) {
+        mostrarMensagem("Preencha todos os campos", "erro");
+        return;
+      }
+
+      try {
+        const resposta = await fetch("/api/produtos", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            nome,
+            descricao,
+            preco: Number(preco),
+            quantidade: Number(quantidade),
+            categoria
+          })
+        });
+
+        const dados = await resposta.json();
+
+        if (!resposta.ok) {
+          throw new Error(dados.erro || "Erro ao cadastrar");
+        }
+
+        form.reset();
+        mostrarMensagem("Produto cadastrado com sucesso", "sucesso");
+        carregarProdutos();
+      } catch (error) {
+        mostrarMensagem(error.message, "erro");
+      }
+    });
+
+    async function excluirProduto(id) {
+      try {
+        const resposta = await fetch(`/api/produtos/${id}`, {
+          method: "DELETE"
+        });
+
+        const dados = await resposta.json();
+
+        if (!resposta.ok) {
+          throw new Error(dados.erro || "Erro ao excluir");
+        }
+
+        mostrarMensagem("Produto excluído com sucesso", "sucesso");
+        carregarProdutos();
+      } catch (error) {
+        mostrarMensagem(error.message, "erro");
+      }
+    }
+
+    carregarProdutos();
+  </script>
+</body>
+</html>
